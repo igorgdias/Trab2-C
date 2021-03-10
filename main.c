@@ -29,7 +29,6 @@ typedef struct Cidade {
     Pessoa *infectados;
     int numInfectados;
     float infeccaoProporcional;
-    float letalidadeProporcional;
     char *estado;
 } Cidade;
 
@@ -38,8 +37,6 @@ typedef struct Estado {
     Cidade *cidades;
     int numCidades;
     int populacao;
-    float infeccaoProporcional;
-    float letalidadeProporcional;
 } Estado;
 
 typedef struct Pais {
@@ -162,14 +159,12 @@ Estado montaCidades(FILE *file) {
         cidades[cont].numInfectados = 0;
         cidades[cont].populacao = 0;
         cidades[cont].infeccaoProporcional = 0;
-        cidades[cont].letalidadeProporcional = 0;
 
         while (strcmp(pessoa.nome, "\0\0") != 0) {
             if (pessoa.coronaVirus.dataInfeccao.null != 0 && pessoa.coronaVirus.grauDeContagio != 0 &&
                 pessoa.coronaVirus.grauDeLetalidade != 0) {
                 infectados[cidades[cont].numInfectados] = pessoa;
                 cidades[cont].infeccaoProporcional += (float) pessoa.coronaVirus.grauDeContagio;
-                cidades[cont].letalidadeProporcional += (float) pessoa.coronaVirus.grauDeLetalidade;
                 cidades[cont].numInfectados++;
                 if (cidades[cont].numInfectados == sizeInfect) {
                     sizeInfect += 50;
@@ -189,7 +184,6 @@ Estado montaCidades(FILE *file) {
         cidades[cont].infectados = infectados;
         cidades[cont].pessoas = pessoas;
         cidades[cont].infeccaoProporcional /= (float) cidades[cont].populacao;
-        cidades[cont].letalidadeProporcional /= (float) cidades[cont].populacao;
         sizePop = 50;
         sizeInfect = 50;
         pessoas = malloc(sizePop * sizeof(struct Pessoa));
@@ -222,8 +216,6 @@ Pais montaEstados(FILE *file) {
         if (strcmp(tempEstado.nome, cidades[i].nome) != 0) {
             tempCidades = realloc(tempCidades, tempEstado.numCidades * sizeof(Cidade));
             tempEstado.cidades = tempCidades;
-            tempEstado.infeccaoProporcional /= (float) tempEstado.numCidades;
-            tempEstado.letalidadeProporcional /= (float) tempEstado.numCidades;
             estados[pais.numEstados] = tempEstado;
             pais.numEstados++;
             if (pais.numEstados == size) {
@@ -233,14 +225,10 @@ Pais montaEstados(FILE *file) {
 
             tempEstado.nome = cidades[i].nome;
             tempEstado.numCidades = 0;
-            tempEstado.letalidadeProporcional = 0;
-            tempEstado.infeccaoProporcional = 0;
             tempEstado.populacao = 0;
         }
         tempCidades[tempEstado.numCidades] = cidades[i];
         tempEstado.populacao += cidades[i].populacao;
-        tempEstado.infeccaoProporcional += cidades[i].infeccaoProporcional;
-        tempEstado.letalidadeProporcional += cidades[i].letalidadeProporcional;
         tempEstado.numCidades++;
         if (tempEstado.numCidades == sizeCity) {
             sizeCity += 50;
@@ -254,77 +242,71 @@ Pais montaEstados(FILE *file) {
 
 int intervaloData() {}
 
-void printPessoa(Pessoa pessoa) {
+void printPessoa(Pessoa *pessoa) {
     char grauCont[4][5] = {"Zero", "Baixo", "Medio", "Alto"};
     char grauLet[4][5] = {"Zero", "Baixa", "Media", "Alta"};
-    CoronaVirus corona = pessoa.coronaVirus;
-    Data data = corona.dataInfeccao;
-    printf("%s %d %c", pessoa.nome, pessoa.idade, pessoa.sexo);
-    printf(" %d/%d/%d", data.dia, data.mes, data.ano);
-    printf(" %s %s\n", grauCont[corona.grauDeContagio], grauLet[corona.grauDeLetalidade]);
+    CoronaVirus *corona = &pessoa->coronaVirus;
+    Data *data = &corona->dataInfeccao;
+    printf("%s %d %c", pessoa->nome, pessoa->idade, pessoa->sexo);
+    printf(" %d/%d/%d", data->dia, data->mes, data->ano);
+    printf(" %s %s\n", grauCont[corona->grauDeContagio], grauLet[corona->grauDeLetalidade]);
 }
 
-void estatisticas(Pais pais) {
-    Estado estado;
-    Cidade cidade;
-    Cidade cidadeMaiorInfeccao[2];
-    Cidade cidadeMaiorLetalidade[2];
-    Estado estadoMaiorInfeccao[2];
-    Estado estadoMaiorLetalidade[2];
-    estadoMaiorInfeccao[0] = pais.estados[0];
-    estadoMaiorLetalidade[0] = pais.estados[0];
-    for (int i = 0; i < pais.numEstados; ++i) {
-        estado = pais.estados[i];
+void estatisticas(Pais *pais) {
+    int size = 50;
+    int cont = 0;
+    float letalidadeEstadoIntervalo = 0;
+    float letalidadeCidadeIntervalo = 0;
+    float maiorLetalidadeEstadoIntervalo = 0;
+    float maiorLetalidadeCidadeIntervalo = 0;
+    Estado *estado;
+    Cidade *cidade;
+    Pessoa *infectado;
+    Cidade *cidadeMaiorInfeccao[2];
+    Cidade *cidadeMaiorLetalidadeIntervalo[2];
+    Estado *estadoMaiorLetalidadeIntervalo[2];
+    Pessoa **m80_100a = malloc(size * sizeof(Pessoa));
+    estadoMaiorLetalidadeIntervalo[0] = &pais->estados[0];
+    for (int i = 0; i < pais->numEstados; ++i) {
+        estado = &pais->estados[i];
 
-        if (estadoMaiorInfeccao[0].infeccaoProporcional < estado.infeccaoProporcional) {
-            estadoMaiorInfeccao[0] = estado;
-            estadoMaiorInfeccao[1] = estado;
-        } else if (estadoMaiorInfeccao[0].infeccaoProporcional == estado.infeccaoProporcional) {
-            estadoMaiorInfeccao[1] = estado;
-        }
+        printf("%s:\n", estado->nome);
 
-        if (estadoMaiorLetalidade[0].letalidadeProporcional < estado.letalidadeProporcional) {
-            estadoMaiorLetalidade[0] = estado;
-            estadoMaiorLetalidade[1] = estado;
-        } else if (estadoMaiorLetalidade[0].letalidadeProporcional == estado.letalidadeProporcional) {
-            estadoMaiorLetalidade[1] = estado;
-        }
+        cidadeMaiorInfeccao[0] = &estado->cidades[0];
+        cidadeMaiorLetalidadeIntervalo[0] = &estado->cidades[0];
 
-        printf("%s:\n", estado.nome);
+        for (int j = 0; j < estado->numCidades; ++j) {
+            cidade = &estado->cidades[j];
 
-        cidadeMaiorInfeccao[0] = estado.cidades[0];
-        cidadeMaiorLetalidade[0] = estado.cidades[0];
-
-        for (int j = 0; j < estado.numCidades; ++j) {
-            cidade = estado.cidades[j];
-
-            if (cidadeMaiorInfeccao[0].infeccaoProporcional < cidade.infeccaoProporcional) {
+            if (cidadeMaiorInfeccao[0]->infeccaoProporcional < cidade->infeccaoProporcional) {
                 cidadeMaiorInfeccao[0] = cidade;
                 cidadeMaiorInfeccao[1] = cidade;
-            } else if (cidadeMaiorInfeccao[0].infeccaoProporcional == cidade.infeccaoProporcional) {
+            } else if (cidadeMaiorInfeccao[0]->infeccaoProporcional == cidade->infeccaoProporcional) {
                 cidadeMaiorInfeccao[1] = cidade;
             }
 
-            if (cidadeMaiorLetalidade[0].letalidadeProporcional < cidade.letalidadeProporcional) {
-                cidadeMaiorLetalidade[0] = cidade;
-                cidadeMaiorLetalidade[1] = cidade;
-            } else if (cidadeMaiorLetalidade[0].letalidadeProporcional == cidade.letalidadeProporcional) {
-                cidadeMaiorLetalidade[1] = cidade;
-            }
-
-            printf("\n\t%s\n", cidade.nome);
-
-            for (int k = 0; k < cidade.numInfectados; ++k) {
+            printf("\n\t%s\n", cidade->nome);
+            for (int k = 0; k < cidade->numInfectados; ++k) {
+                infectado = &cidade->infectados[k];
+                if (infectado->sexo == 'M' && infectado->idade >= 80 && infectado->idade <= 100 &&
+                    infectado->coronaVirus.grauDeLetalidade == 3) {
+                    m80_100a[cont] = infectado;
+                    cont++;
+                    if (cont == size) {
+                        size += 50;
+                        m80_100a = realloc(m80_100a, size * sizeof(Pessoa));
+                    }
+                }
                 printf("\t\t");
-                printPessoa(cidade.infectados[k]);
+                printPessoa(infectado);
             }
         }
     }
 }
 
 int main() {
-    FILE* file = fopen("cidades.txt", "r");
+    FILE *file = fopen("cidades.txt", "r");
     Pais pais = montaEstados(file);
-    estatisticas(pais);
+    estatisticas(&pais);
     return 0;
 }
